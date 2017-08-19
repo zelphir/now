@@ -32,6 +32,9 @@
     "download/install.js"
   ],
   "pkg": {
+    "assets": [
+      "dist/serverless/handler.js"
+    ],
     "scripts": [
       "dist/*"
     ],
