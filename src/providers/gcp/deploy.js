@@ -82,11 +82,13 @@ const deploy = async (ctx: {
     }
   }
 
+  const { nowJSON: { gcp: gcpConfig } } = desc
+
   const overrides = {
     'function.js': getFunctionHandler(desc)
   }
 
-  const region = 'us-central1'
+  const region = gcpConfig.region || 'us-central1'
 
   console.log(
     info(
@@ -114,13 +116,26 @@ const deploy = async (ctx: {
     )
   )
 
-  const deploymentId = 'now-' + desc.name + '-' + (await uid(10))
+  const deploymentId = gcpConfig.functionName || 'now-' + desc.name + '-' + (await uid(10))
   const zipFileName = `${deploymentId}.zip`
 
   const { project } = ctx.authConfig.credentials.find(p => p.provider === 'gcp')
 
   const resourcesStart = Date.now()
-  const stopResourcesSpinner = wait('Creating API resources')
+
+  debug('checking gcp function check')
+  const fnCheckExists = await fetch(
+    `https://cloudfunctions.googleapis.com/v1beta2/projects/${project.id}/locations/${region}/functions/${deploymentId}`,
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      }
+    }
+  )
+  const fnExists = fnCheckExists.status !== 404
+
+  const stopResourcesSpinner = wait(`${fnExists ? 'Updating' : 'Creating'} API resources`)
 
   if (!ctx.config.gcp) ctx.config.gcp = {}
   if (!ctx.config.gcp.bucketName) {
@@ -184,17 +199,17 @@ const deploy = async (ctx: {
 
   debug('creating gcp function create')
   const fnCreateRes = await fetch(
-    `https://cloudfunctions.googleapis.com/v1beta2/projects/${project.id}/locations/${region}/functions`,
+    `https://cloudfunctions.googleapis.com/v1beta2/projects/${project.id}/locations/${region}/functions${fnExists ? `/${deploymentId}` : ''}`,
     {
-      method: 'POST',
+      method: fnExists ? 'PUT' : 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
       body: JSON.stringify({
         name: `projects/${project.id}/locations/${region}/functions/${deploymentId}`,
-        timeout: '15s',
-        availableMemoryMb: 512,
+        timeout: gcpConfig.timeput || '15s',
+        availableMemoryMb: gcpConfig.memory || 512,
         sourceArchiveUrl: `gs://${encodeURIComponent(
           bucketName
         )}/${zipFileName}`,
@@ -263,7 +278,7 @@ const deploy = async (ctx: {
   stopResourcesSpinner()
   console.log(
     ok(
-      `API resources created (id: ${param(deploymentId)}) ${gray(
+      `API resources ${fnExists ? 'updated' : 'created'} (id: ${param(deploymentId)}) ${gray(
         `[${ms(Date.now() - resourcesStart)}]`
       )}`
     )
