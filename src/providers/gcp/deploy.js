@@ -124,7 +124,7 @@ const deploy = async (ctx: {
   const resourcesStart = Date.now()
 
   debug('checking gcp function check')
-  const fnCheckExists = await fetch(
+  const fnCheckExistsRes = await fetch(
     `https://cloudfunctions.googleapis.com/v1beta2/projects/${project.id}/locations/${region}/functions/${deploymentId}`,
     {
       headers: {
@@ -133,7 +133,7 @@ const deploy = async (ctx: {
       }
     }
   )
-  const fnExists = fnCheckExists.status !== 404
+  const fnExists = fnCheckExistsRes.status !== 404
 
   const stopResourcesSpinner = wait(`${fnExists ? 'Updating' : 'Creating'} API resources`)
 
@@ -255,24 +255,14 @@ const deploy = async (ctx: {
       await sleep(5000)
     }
 
-    const fnRes = await fetch(
-      `https://cloudfunctions.googleapis.com/v1beta2/projects/${project.id}/locations/${region}/functions/${deploymentId}`,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-    )
-
     try {
-      await assertSuccessfulResponse(fnRes)
+      await assertSuccessfulResponse(fnCheckExistsRes)
     } catch (err) {
       console.error(error(err.message))
       return 1
     }
 
-    ;({ status, httpsTrigger: { url } } = await fnRes.json())
+    ;({ status, httpsTrigger: { url } } = await fnCheckExistsRes.json())
   } while (status !== 'READY')
 
   stopResourcesSpinner()
