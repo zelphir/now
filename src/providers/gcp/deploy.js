@@ -82,6 +82,13 @@ const deploy = async (ctx: {
     }
   }
 
+  // Example now.json for gcpConfig
+  // {
+  //   name: String,
+  //   timeout: String,
+  //   availableMemoryMb: Number,
+  //   region: String
+  // }
   const { nowJSON: { gcp: gcpConfig } } = desc
 
   const overrides = {
@@ -116,7 +123,7 @@ const deploy = async (ctx: {
     )
   )
 
-  const deploymentId = gcpConfig.functionName || 'now-' + desc.name + '-' + (await uid(10))
+  const deploymentId = gcpConfig.name || 'now-' + desc.name + '-' + (await uid(10))
   const zipFileName = `${deploymentId}.zip`
 
   const { project } = ctx.authConfig.credentials.find(p => p.provider === 'gcp')
@@ -208,8 +215,8 @@ const deploy = async (ctx: {
       },
       body: JSON.stringify({
         name: `projects/${project.id}/locations/${region}/functions/${deploymentId}`,
-        timeout: gcpConfig.timeput || '15s',
-        availableMemoryMb: gcpConfig.memory || 512,
+        timeout: gcpConfig.timeout || '15s',
+        availableMemoryMb: gcpConfig.availableMemoryMb || 512,
         sourceArchiveUrl: `gs://${encodeURIComponent(
           bucketName
         )}/${zipFileName}`,
